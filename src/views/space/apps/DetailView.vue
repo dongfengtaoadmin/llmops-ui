@@ -35,7 +35,6 @@ const send = async () => {
     const response = await debugApp(route.params.app_id as string, humanQuery)
     const content = response.data.content
 
-    console.log(content,'ssssssssss')
     messages.value.push({
       role: 'ai',
       content: content,
