@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import {
   useCreateOrUpdateDataset,
   useDeleteDataset,
@@ -10,6 +11,7 @@ import moment from 'moment'
 import type { ValidatedError } from '@arco-design/web-vue'
 
 let updateDatasetID = ''
+const router = useRouter()
 const props = defineProps({
   createType: {
     type: String,
@@ -59,6 +61,14 @@ const handleUpdate = (dataset_id: string) => {
   })
 }
 
+// 跳转到知识库文档列表
+const handleGoToDocuments = (dataset_id: string) => {
+  router.push({
+    name: 'space-datasets-documents-list',
+    params: { dataset_id },
+  })
+}
+
 // 取消显示模态窗
 const handleCancel = () => {
   updateShowUpdateModal(false, async () => {
@@ -95,7 +105,11 @@ const handleSubmit = async ({ errors }: { errors: Record<string, ValidatedError>
     <a-row :gutter="[20, 20]" class="flex-1">
       <!-- 有数据的UI状态 -->
       <a-col v-for="dataset in datasets" :key="dataset.id" :span="6">
-        <a-card hoverable class="cursor-pointer rounded-lg">
+        <a-card
+          hoverable
+          class="cursor-pointer rounded-lg"
+          @click="handleGoToDocuments(dataset.id)"
+        >
           <!-- 顶部知识库名称 -->
           <div class="flex items-center gap-3 mb-3">
             <!-- 左侧图标 -->
@@ -103,14 +117,7 @@ const handleSubmit = async ({ errors }: { errors: Record<string, ValidatedError>
             <!-- 右侧知识库信息 -->
             <div class="flex flex-1 justify-between">
               <div class="flex flex-col">
-                <router-link
-                  :to="{
-                    name: 'space-datasets-documents-list',
-                    params: { dataset_id: dataset.id },
-                  }"
-                  class="text-base text-gray-900 font-bold"
-                  >{{ dataset.name }}
-                </router-link>
+                <div class="text-base text-gray-900 font-bold">{{ dataset.name }}</div>
                 <div class="text-xs text-gray-500 line-clamp-1">
                   {{ dataset.document_count }} 文档 ·
                   {{ Math.round(dataset.character_count / 1000) }} 千字符 ·
@@ -118,8 +125,13 @@ const handleSubmit = async ({ errors }: { errors: Record<string, ValidatedError>
                 </div>
               </div>
               <!-- 操作按钮 -->
-              <a-dropdown position="br">
-                <a-button type="text" size="small" class="rounded-lg !text-gray-700">
+              <a-dropdown position="br" @click.stop>
+                <a-button
+                  type="text"
+                  size="small"
+                  class="rounded-lg !text-gray-700"
+                  @click.stop
+                >
                   <template #icon>
                     <icon-more />
                   </template>
