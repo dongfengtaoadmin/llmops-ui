@@ -21,7 +21,7 @@ onMounted(async () => {
     await router.replace({ path: '/home' })
   } catch (error) {
     // 3.出现错误则重定向到登录页面
-    await router.replace({ path: '/auth/login' })
+    // await router.replace({ path: '/auth/login' })
   }
 })
 </script>

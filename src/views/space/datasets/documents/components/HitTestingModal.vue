@@ -97,6 +97,8 @@ watch(
     }
   },
 )
+
+console.log(hitTestingForm,'hitTestingFormhitTestingForm dft')
 </script>
 
 <template>
