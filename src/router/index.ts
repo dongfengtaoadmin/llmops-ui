@@ -71,9 +71,20 @@ const router = createRouter({
           component: () => import('@/views/store/tools/ListView.vue'),
         },
         {
-          path: 'open',
-          name: 'open-index',
-          component: () => import('@/views/open/IndexView.vue'),
+          path: 'openapi',
+          component: () => import('@/views/openapi/OpenAPILayoutView.vue'),
+          children: [
+            {
+              path: '',
+              name: 'openapi-index',
+              component: () => import('@/views/openapi/IndexView.vue'),
+            },
+            {
+              path: 'api-keys',
+              name: 'openapi-api-keys-list',
+              component: () => import('@/views/openapi/api-keys/ListView.vue'),
+            },
+          ],
         },
       ],
     },
@@ -112,12 +123,32 @@ const router = createRouter({
             },
           ],
         },
+        {
+          path: 'space/workflows/:workflow_id',
+          name: 'space-workflows-detail',
+          component: () => import('@/views/space/workflows/DetailView.vue'),
+        },
+        {
+          path: 'web-apps/:token',
+          name: 'web-apps-index',
+          component: () => import('@/views/web-apps/IndexView.vue'),
+        },
+        {
+          path: '/errors/404',
+          name: 'errors-not-found',
+          component: () => import('@/views/errors/NotFoundView.vue'),
+        },
+        {
+          path: '/errors/403',
+          name: 'errors-forbidden',
+          component: () => import('@/views/errors/ForbiddenView.vue'),
+        },
       ],
     },
   ],
 })
 
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   if (!auth.isLogin() && !['auth-login', 'auth-authorize'].includes(to.name as string)) {
     return { path: '/auth/login' }
   }

@@ -1,47 +1,194 @@
-import { onMounted, reactive, ref } from 'vue'
+import { ref } from 'vue'
 import {
   cancelPublish,
+  copyApp,
+  createApp,
   debugChat,
+  deleteApp,
   deleteDebugConversation,
   fallbackHistoryToDraft,
   getApp,
+  getAppsWithPage,
   getDebugConversationMessagesWithPage,
   getDebugConversationSummary,
   getDraftAppConfig,
+  getPublishedConfig,
   getPublishHistoriesWithPage,
   publish,
+  regenerateWebAppToken,
   stopDebugChat,
+  updateApp,
   updateDebugConversationSummary,
   updateDraftAppConfig,
 } from '@/services/app'
 import { Message, Modal } from '@arco-design/web-vue'
 import type {
+  CreateAppRequest,
+  GetAppsWithPageResponse,
   GetDebugConversationMessagesWithPageResponse,
+  UpdateAppRequest,
   UpdateDraftAppConfigRequest,
 } from '@/models/app'
+import { useRouter } from 'vue-router'
 
-export const useGetApp = (app_id: string) => {
+export const useGetApp = () => {
   // 1.定义hooks所需的基础数据
   const loading = ref(false)
-  const app = reactive<Record<string, any>>({})
+  const app = ref<Record<string, any>>({})
 
   // 2.定义加载数据所需的函数
   const loadApp = async (app_id: string) => {
     try {
       loading.value = true
       const resp = await getApp(app_id)
-      const data = resp.data
-
-      Object.assign(app, { ...data })
+      app.value = resp.data
     } finally {
       loading.value = false
     }
   }
 
-  // 3.页面DOM加载完毕时加载一次数据
-  onMounted(async () => await loadApp(app_id))
-
   return { loading, app, loadApp }
+}
+
+export const useGetAppsWithPage = () => {
+  // 1.定义hooks所需数据
+  const loading = ref(false)
+  const apps = ref<GetAppsWithPageResponse['data']['list']>([])
+  const defaultPaginator = {
+    current_page: 1,
+    page_size: 20,
+    total_page: 0,
+    total_record: 0,
+  }
+  const paginator = ref({ ...defaultPaginator })
+
+  // 2.定义加载数据函数
+  const loadApps = async (init: boolean = false, search_word: string = '') => {
+    // 2.1 判断是否是初始化，如果是的话则先初始化分页器
+    if (init) {
+      paginator.value = defaultPaginator
+    } else if (paginator.value.current_page > paginator.value.total_page) {
+      return
+    }
+
+    // 2.2 加载数据并更新
+    try {
+      // 2.3 将loading值改为true并调用api接口获取数据
+      loading.value = true
+      const resp = await getAppsWithPage({
+        current_page: paginator.value.current_page,
+        page_size: paginator.value.page_size,
+        search_word: search_word,
+      })
+      const data = resp.data
+
+      // 2.4 更新分页器
+      paginator.value = data.paginator
+
+      // 2.5 判断是否存在更多数据
+      if (paginator.value.current_page <= paginator.value.total_page) {
+        paginator.value.current_page += 1
+      }
+
+      // 2.6 追加或者是覆盖数据
+      if (init) {
+        apps.value = data.list
+      } else {
+        apps.value.push(...data.list)
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, apps, paginator, loadApps }
+}
+
+export const useCreateApp = () => {
+  // 1.定义hooks所需数据
+  const router = useRouter()
+  const loading = ref(false)
+
+  // 2.定义新增应用处理器
+  const handleCreateApp = async (req: CreateAppRequest) => {
+    try {
+      loading.value = true
+      const resp = await createApp(req)
+      Message.success('新增Agent应用成功')
+      await router.push({
+        name: 'space-apps-detail',
+        params: { app_id: resp.data.id },
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, handleCreateApp }
+}
+
+export const useUpdateApp = () => {
+  // 1.定义hooks所需数据
+  const loading = ref(false)
+
+  // 2.定义更新数据处理器
+  const handleUpdateApp = async (app_id: string, req: UpdateAppRequest) => {
+    try {
+      loading.value = true
+      const resp = await updateApp(app_id, req)
+      Message.success(resp.message)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, handleUpdateApp }
+}
+
+export const useCopyApp = () => {
+  // 1.定义hooks所需数据
+  const router = useRouter()
+  const loading = ref(false)
+
+  // 2.定义拷贝应用副本处理器
+  const handleCopyApp = async (app_id: string) => {
+    try {
+      // 2.1 修改loading并发起请求
+      loading.value = true
+      const resp = await copyApp(app_id)
+
+      // 2.2 成功修改则进行提示并跳转页面
+      Message.success('创建应用副本成功')
+      await router.push({ name: 'space-apps-detail', params: { app_id: resp.data.id } })
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, handleCopyApp }
+}
+
+export const useDeleteApp = () => {
+  const handleDeleteApp = async (app_id: string, callback?: () => void) => {
+    Modal.warning({
+      title: '要删除该应用吗?',
+      content:
+        '删除应用后，发布的WebApp、开放API以及关联的社交媒体平台均无法使用该Agent应用，如果需要暂停应用，可使用取消发布功能。',
+      hideCancel: false,
+      onOk: async () => {
+        try {
+          // 1.点击确定后向API接口发起请求
+          const resp = await deleteApp(app_id)
+          Message.success(resp.message)
+        } finally {
+          // 2.调用callback函数指定回调功能
+          callback && callback()
+        }
+      },
+    })
+  }
+
+  return { handleDeleteApp }
 }
 
 export const usePublish = () => {
@@ -101,43 +248,40 @@ export const useGetPublishHistoriesWithPage = () => {
     total_page: 0,
     total_record: 0,
   }
-  const publishHistories = reactive<Array<Record<string, any>>>([])
-  const paginator = reactive({ ...defaultPaginator })
+  const publishHistories = ref<Record<string, any>[]>([])
+  const paginator = ref(defaultPaginator)
 
   // 2.定义加载数据函数
   const loadPublishHistories = async (app_id: string, init: boolean = false) => {
     try {
       // 2.1 判断是否为初始化，如果是则先初始化分页器
       if (init) {
-        Object.assign(paginator, { ...defaultPaginator })
-      } else if (paginator.current_page > paginator.total_page) {
+        paginator.value = defaultPaginator
+      } else if (paginator.value.current_page > paginator.value.total_page) {
         return
       }
 
       // 2.2 调用API接口获取数据
       loading.value = true
       const resp = await getPublishHistoriesWithPage(app_id, {
-        current_page: paginator.current_page,
-        page_size: paginator.page_size,
+        current_page: paginator.value.current_page,
+        page_size: paginator.value.page_size,
       })
       const data = resp.data
 
       // 2.3 更新分页器数据
-      paginator.current_page = data.paginator.current_page
-      paginator.page_size = data.paginator.page_size
-      paginator.total_page = data.paginator.total_page
-      paginator.total_record = data.paginator.total_record
+      paginator.value = data.paginator
 
       // 2.4 是否存在更多数据
-      if (paginator.current_page <= paginator.total_page) {
-        paginator.current_page += 1
+      if (paginator.value.current_page <= paginator.value.total_page) {
+        paginator.value.current_page += 1
       }
 
       // 2.5 检测是追加数据还是覆盖数据
       if (init) {
-        publishHistories.splice(0, publishHistories.length, ...data.list)
+        publishHistories.value = data.list
       } else {
-        publishHistories.push(...data.list)
+        publishHistories.value.push(...data.list)
       }
     } finally {
       loading.value = false
@@ -170,10 +314,10 @@ export const useFallbackHistoryToDraft = () => {
   return { loading, handleFallbackHistoryToDraft }
 }
 
-export const useGetDraftAppConfig = (app_id: string) => {
+export const useGetDraftAppConfig = () => {
   // 1.定义hooks所需数据
   const loading = ref(false)
-  const draftAppConfigForm = reactive<Record<string, any>>({})
+  const draftAppConfigForm = ref<Record<string, any>>({})
 
   // 2.定义加载数据函数
   const loadDraftAppConfig = async (app_id: string) => {
@@ -184,7 +328,9 @@ export const useGetDraftAppConfig = (app_id: string) => {
       const data = resp.data
 
       // 2.2 将数据同步到表单中
-      Object.assign(draftAppConfigForm, {
+      draftAppConfigForm.value = {
+        dialog_round: data.dialog_round,
+        model_config: data.model_config,
         preset_prompt: data.preset_prompt,
         long_term_memory: data.long_term_memory,
         opening_statement: data.opening_statement,
@@ -194,13 +340,12 @@ export const useGetDraftAppConfig = (app_id: string) => {
         datasets: data.datasets,
         retrieval_config: data.retrieval_config,
         tools: data.tools,
-      })
+        workflows: data.workflows,
+      }
     } finally {
       loading.value = false
     }
   }
-
-  onMounted(async () => await loadDraftAppConfig(app_id))
 
   return { loading, draftAppConfigForm, loadDraftAppConfig }
 }
@@ -376,4 +521,43 @@ export const useStopDebugChat = () => {
   }
 
   return { loading, handleStopDebugChat }
+}
+
+export const useGetPublishedConfig = () => {
+  // 1.定义hooks所需数据
+  const loading = ref(false)
+  const published_config = ref<Record<string, any>>({})
+
+  // 2.定义加载数据函数
+  const loadPublishedConfig = async (app_id: string) => {
+    try {
+      loading.value = true
+      const resp = await getPublishedConfig(app_id)
+      published_config.value = resp.data
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, published_config, loadPublishedConfig }
+}
+
+export const useRegenerateWebAppToken = () => {
+  // 1.定义hooks所需数据
+  const loading = ref(false)
+  const token = ref<string>('')
+
+  // 2.定义重生成WebAppToken函数
+  const handleRegenerateWebAppToken = async (app_id: string) => {
+    try {
+      loading.value = true
+      const resp = await regenerateWebAppToken(app_id)
+      Message.success('重新生成WebApp访问链接成功')
+      token.value = resp.data.token
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, token, handleRegenerateWebAppToken }
 }
