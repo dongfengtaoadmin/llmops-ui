@@ -15,7 +15,7 @@ RUN yarn install
 COPY . .
 
 # 配置环境变量
-ENV VITE_API_PREFIX=http://localhost:9000
+ENV VITE_API_PREFIX=/api
 
 # 构建/编译项目
 RUN yarn build
@@ -31,8 +31,8 @@ RUN find /usr/share/nginx/html -type d -exec chmod 755 {} \;
 # 设置文件权限为 644，确保文件可以读但不可执行
 RUN find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
-# 暴露 80 端口号
-EXPOSE 80
+# 暴露 3000 端口号
+EXPOSE 3000
 
 # 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
